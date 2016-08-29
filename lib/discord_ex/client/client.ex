@@ -174,6 +174,12 @@ defmodule DiscordEx.Client do
     {:ok, state}
   end
 
+  def websocket_info({:update_status, new_status}, _connection, state) do
+    payload = payload_build(opcode(opcodes, :status_update), new_status)
+    :websocket_client.cast(self, {:binary, payload})
+    {:ok, state}
+  end
+
   def websocket_terminate(reason, _conn_state, state) do
     Logger.info "Websocket closed in state #{inspect state} wih reason #{inspect reason}"
     Logger.info "Killing seq_num process!"
@@ -302,5 +308,27 @@ defmodule DiscordEx.Client do
       :voice_server_update -> true
                          _ -> false
     end
+  end
+
+  @doc """
+  User login that returns connection
+
+  ## Parameters
+
+    - new_status: map with new status
+
+    Supported keys in that map: `:idle_since` and `:game_name`.
+    If some of them are missing `nil` is used.
+
+  ## Examples
+      new_status = %{idle_since: 123456, game_name: "some game"}
+      Client.status_update(state, new_status)
+  """
+  @spec status_update(map, map) :: any
+  def status_update(state, new_status) do
+    idle_since = Map.get(new_status, :idle_since)
+    game_name = Map.get(new_status, :game_name)
+    data = %{"idle_since" => idle_since, "game" => %{"name" => game_name}}
+    send(state[:client_pid], {:update_status, data})
   end
 end
